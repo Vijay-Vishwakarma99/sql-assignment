@@ -1,0 +1,97 @@
+-- Q1 Create a new database named company_db and Create a table named employees with the following columns:
+
+create database company_db;
+
+use company_db;
+create table employees(
+employee_id int primary key,
+first_name varchar(50),
+last_name varchar(50),
+department varchar(50),
+salary int,
+hire_date date);
+
+select * from employees;
+
+-- Q2 Task: Insert the following sample records into the employees table.
+
+insert into employees()
+values(101,'Amit','Sharma','hr',50000,'2020-01-15'),
+(102,'Riya','kapoor','sales',75000,'2019-03-22'),
+(103,'Raj','Mehta','IT',90000,'2018-07-11'),
+(104,'Neha','Verma','IT',85000,'2021-09-01'),
+(105,'Arjun','singh','finance',60000,'2022-02-10');
+
+-- Q3. Display All Employee Records Sorted by Salary (Lowest to Highest)
+     -- Hint: Use the ORDER BY clause on the salary column.
+
+select * from employees
+order by salary asc;
+
+-- Q4. Show Employees Sorted by Department (A-Z) and Salary (High - Low)
+
+SELECT *
+FROM employees
+ORDER BY department ASC, salary DESC;
+
+-- Q5. List All Employees in the IT Department, Ordered by Hire Date (Newest First)
+
+SELECT *
+FROM employees
+WHERE department = 'IT'
+ORDER BY hire_date DESC;
+
+-- Q6. Create and Populate a Sales Table
+-- Task: Create a table sales to track sales data
+
+CREATE TABLE sales (
+    sale_id INT PRIMARY KEY,
+    customer_name VARCHAR(50),
+    amount INT,
+    sale_date DATE
+);
+
+select * from sales;
+
+insert into sales()
+values(1,'Aditi',1500,'2024-08-01'),
+(2,'Rohan',2200,'2024-08-03'),
+(3,'Aditi',3500,'2024-09-05'),
+(4,'Meena',2700,'2024-09-15'),
+(5,'Rohan',4500,'2024-09-25');
+
+-- Q7. Display All Sales Records Sorted by Amount (Highest → Lowest)
+
+select * from sales
+order by amount desc;
+
+-- Q8. Show All Sales Made by Customer “Aditi”
+
+select * from sales
+where customer_name="Aditi";
+
+
+-- Q9. What is the Difference Between a Primary Key and a Foreign Key?
+-- Answer:- Primary Key..
+
+-- A Primary Key uniquely identifies each record in a table
+-- It cannot contain NULL values
+-- It must be unique (no duplicates allowed)
+-- Each table can have only one primary key
+
+-- Foreign Key....
+
+-- A Foreign Key is a column that links one table to another.
+-- It refers to the primary key of another table.
+-- It can contain duplicate values.
+-- It can contain NULL values (if allowed).
+
+
+-- Q10. What Are Constraints in SQL and Why Are They Used? 
+-- Answer:- Constraints in SQL are rules applied to table columns to control the type of data that can be inserted. 
+		     -- They help maintain accuracy, consistency, and integrity of the data in a database.
+-- Why Are Constraints Used?
+-- To prevent invalid data entry.
+-- To ensure data consistency across tables.
+-- To maintain data integrity.
+-- To enforce relationships between tables.
