@@ -1,0 +1,349 @@
+/* ============================================================
+   ADVANCED SQL - ASSIGNMENT ANSWERS (MySQL 8.0+)
+   Q1-Q5 : Theory answers (written as comments)
+   Q6-Q10: Practical SQL, step by step
+   ============================================================ */
+
+
+/* ============================================================
+   Q1. What is a CTE, and how does it improve readability?
+   ============================================================
+   A Common Table Expression (CTE) is a temporary, named result set
+   defined with the WITH keyword. It exists only for the single
+   query that follows it.
+
+   Syntax:
+       WITH cte_name AS (
+           SELECT ...
+       )
+       SELECT ... FROM cte_name;
+
+   How it improves readability:
+   1. Breaks a complex query into small, named, logical steps
+      (instead of deeply nested subqueries).
+   2. The query reads top-to-bottom, like a story.
+   3. The same CTE can be referenced several times in one query,
+      so the logic is not repeated.
+   4. Supports recursion (e.g., employee -> manager hierarchies).
+   5. Easier to debug: each CTE can be tested on its own.
+   ============================================================ */
+
+
+/* ============================================================
+   Q2. Why are some views updatable while others are read-only?
+   ============================================================
+   A view is only updatable when every row in the view maps to
+   exactly ONE row in ONE underlying table, so the database knows
+   which base row to change.
+
+   A view is UPDATABLE when it:
+   - selects from a single table
+   - has simple column references (no calculations)
+   - uses no DISTINCT, GROUP BY, HAVING, aggregate functions
+     (SUM, AVG, COUNT...), UNION, or window functions
+
+   A view is READ-ONLY when it uses any of the above, because one
+   view row may represent many base rows (or a computed value
+   that does not exist in any table).
+
+   Example:
+       -- Updatable
+       CREATE VIEW v_simple AS
+       SELECT ProductID, ProductName, Price FROM Products;
+
+       -- Read-only (uses GROUP BY + AVG)
+       CREATE VIEW v_summary AS
+       SELECT Category, AVG(Price) AS AvgPrice
+       FROM Products GROUP BY Category;
+
+       -- UPDATE v_summary SET AvgPrice = 1000;  -> ERROR
+       --   (which product's price should change?)
+   ============================================================ */
+
+
+/* ============================================================
+   Q3. Advantages of stored procedures over repeated raw SQL
+   ============================================================
+   A stored procedure is a named, saved block of SQL stored in
+   the database and run with CALL procedure_name(...).
+
+   1. Reusability   - write once, call many times.
+   2. Maintainability - change the logic in one place only.
+   3. Performance   - compiled/cached on the server, less
+      network traffic (one CALL instead of many statements).
+   4. Security      - users can be given permission to run the
+      procedure without direct access to the tables; helps
+      prevent SQL injection when parameters are used.
+   5. Consistency   - everyone runs the same business logic.
+   6. Supports parameters, variables, loops, conditions and
+      transactions (full programming logic).
+   ============================================================ */
+
+
+/* ============================================================
+   Q4. Purpose of triggers + one essential use case
+   ============================================================
+   A trigger is a block of SQL that runs AUTOMATICALLY when an
+   INSERT, UPDATE or DELETE happens on a table (BEFORE or AFTER).
+
+   Purposes:
+   - Enforce business rules and data integrity
+   - Auditing / logging changes
+   - Automatically maintain related or derived data
+   - Validate or modify data before it is saved
+
+   Essential use case: AUDIT / ARCHIVE
+   When a product is deleted, a trigger automatically copies the
+   deleted row into an archive table. This works no matter which
+   application or user runs the DELETE, so no deleted data is
+   ever lost (see Q10).
+   ============================================================ */
+
+
+/* ============================================================
+   Q5. Need for data modelling and normalization
+   ============================================================
+   DATA MODELLING = designing the structure of the database
+   (entities/tables, attributes/columns, relationships, keys)
+   BEFORE creating it (ER diagram -> tables).
+
+   Why it is needed:
+   - Gives a clear blueprint that business and developers agree on
+   - Ensures data is stored logically and relationships are correct
+   - Reduces rework and design mistakes later
+
+   NORMALIZATION = organizing tables into smaller related tables
+   (1NF, 2NF, 3NF...) to remove redundancy.
+
+   Why it is needed:
+   1. Removes duplicate data (saves storage)
+   2. Prevents anomalies:
+        - Insert anomaly (cannot add data without other data)
+        - Update anomaly (must change the same data in many rows)
+        - Delete anomaly (deleting a row loses unrelated data)
+   3. Keeps data consistent and accurate
+   4. Makes the database easier to maintain and extend
+
+   Example: Products and Sales are kept in separate tables linked
+   by ProductID, instead of repeating product name and price in
+   every sale row.
+   ============================================================ */
+
+
+
+/* ============================================================
+   DATASET SETUP (used for Q6 - Q10)
+   ============================================================ */
+
+DROP TABLE IF EXISTS Sales;
+DROP TABLE IF EXISTS Products;
+
+CREATE TABLE Products (
+    ProductID   INT PRIMARY KEY,
+    ProductName VARCHAR(100),
+    Category    VARCHAR(50),
+    Price       DECIMAL(10,2)
+);
+
+INSERT INTO Products VALUES
+(1, 'Keyboard', 'Electronics', 1200),
+(2, 'Mouse',    'Electronics', 800),
+(3, 'Chair',    'Furniture',   2500),
+(4, 'Desk',     'Furniture',   5500);
+
+CREATE TABLE Sales (
+    SaleID    INT PRIMARY KEY,
+    ProductID INT,
+    Quantity  INT,
+    SaleDate  DATE,
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+INSERT INTO Sales VALUES
+(1, 1, 4,  '2024-01-05'),
+(2, 2, 10, '2024-01-06'),
+(3, 3, 2,  '2024-01-10'),
+(4, 4, 1,  '2024-01-11');
+
+
+
+/* ============================================================
+   Q6. CTE: total revenue per product (Price x Quantity),
+       return only products where revenue > 3000
+   ============================================================
+   Step 1: Join Products and Sales on ProductID.
+   Step 2: Calculate revenue = Price * Quantity, summed per product.
+   Step 3: Put that logic in a CTE named ProductRevenue.
+   Step 4: Select from the CTE and filter revenue > 3000.
+   ============================================================ */
+
+WITH ProductRevenue AS (
+    SELECT
+        p.ProductID,
+        p.ProductName,
+        SUM(p.Price * s.Quantity) AS TotalRevenue
+    FROM Products p
+    JOIN Sales s ON p.ProductID = s.ProductID
+    GROUP BY p.ProductID, p.ProductName
+)
+SELECT ProductID, ProductName, TotalRevenue
+FROM ProductRevenue
+WHERE TotalRevenue > 3000;
+
+/* Expected output (all 4 products qualify):
+   ProductID | ProductName | TotalRevenue
+   1         | Keyboard    | 4800.00   (1200 x 4)
+   2         | Mouse       | 8000.00   (800 x 10)
+   3         | Chair       | 5000.00   (2500 x 2)
+   4         | Desk        | 5500.00   (5500 x 1)
+*/
+
+
+
+/* ============================================================
+   Q7. View vw_CategorySummary: Category, TotalProducts,
+       AveragePrice
+   ============================================================
+   Step 1: Group the Products table by Category.
+   Step 2: COUNT products and take AVG of price for each group.
+   Step 3: Wrap the query in CREATE VIEW.
+   Step 4: Query the view to check the result.
+   ============================================================ */
+
+CREATE OR REPLACE VIEW vw_CategorySummary AS
+SELECT
+    Category,
+    COUNT(*)   AS TotalProducts,
+    AVG(Price) AS AveragePrice
+FROM Products
+GROUP BY Category;
+
+SELECT * FROM vw_CategorySummary;
+
+/* Expected output:
+   Category    | TotalProducts | AveragePrice
+   Electronics | 2             | 1000.000000
+   Furniture   | 2             | 4000.000000
+*/
+
+
+
+/* ============================================================
+   Q8. Updatable view (ProductID, ProductName, Price) and
+       update the price of ProductID = 1 through the view
+   ============================================================
+   Step 1: Create a simple view on ONE table with plain columns
+           (no GROUP BY / aggregates), so it is updatable.
+   Step 2: Run UPDATE on the view (not on the table).
+   Step 3: Check that the base table changed too.
+   ============================================================ */
+
+CREATE OR REPLACE VIEW vw_ProductPrice AS
+SELECT ProductID, ProductName, Price
+FROM Products;
+
+-- Update through the view (new price chosen as 1500)
+UPDATE vw_ProductPrice
+SET Price = 1500
+WHERE ProductID = 1;
+
+-- Verify in the view and in the base table
+SELECT * FROM vw_ProductPrice WHERE ProductID = 1;
+SELECT * FROM Products        WHERE ProductID = 1;
+
+/* Expected output:
+   ProductID | ProductName | Price
+   1         | Keyboard    | 1500.00
+*/
+
+
+
+/* ============================================================
+   Q9. Stored procedure: accepts a category name and returns
+       all products in that category
+   ============================================================
+   Step 1: Change the delimiter so MySQL does not end the
+           statement at the first semicolon inside the body.
+   Step 2: Create the procedure with an IN parameter.
+   Step 3: Use the parameter in a SELECT ... WHERE Category = ...
+   Step 4: Restore the delimiter and call the procedure.
+   ============================================================ */
+
+DROP PROCEDURE IF EXISTS GetProductsByCategory;
+
+DELIMITER $$
+
+CREATE PROCEDURE GetProductsByCategory(IN p_category VARCHAR(50))
+BEGIN
+    SELECT ProductID, ProductName, Category, Price
+    FROM Products
+    WHERE Category = p_category;
+END $$
+
+DELIMITER ;
+
+-- Call the procedure
+CALL GetProductsByCategory('Electronics');
+CALL GetProductsByCategory('Furniture');
+
+/* Expected output for 'Electronics':
+   ProductID | ProductName | Category    | Price
+   1         | Keyboard    | Electronics | 1500.00  (1200 if Q8 not run)
+   2         | Mouse       | Electronics | 800.00
+*/
+
+
+
+/* ============================================================
+   Q10. AFTER DELETE trigger on Products that archives deleted
+        rows into ProductArchive
+        (ProductID, ProductName, Category, Price, DeletedAt)
+   ============================================================
+   Step 1: Create the archive table ProductArchive with a
+           DeletedAt column that defaults to the current time.
+   Step 2: Create an AFTER DELETE trigger on Products.
+   Step 3: Inside the trigger, use OLD.column to read the values
+           of the row that was just deleted and INSERT them into
+           ProductArchive.
+   Step 4: Test it by deleting a product.
+   ============================================================ */
+
+-- Step 1: Archive table
+DROP TABLE IF EXISTS ProductArchive;
+
+CREATE TABLE ProductArchive (
+    ProductID   INT,
+    ProductName VARCHAR(100),
+    Category    VARCHAR(50),
+    Price       DECIMAL(10,2),
+    DeletedAt   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Step 2 & 3: Trigger
+DROP TRIGGER IF EXISTS trg_ProductArchive_AfterDelete;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_ProductArchive_AfterDelete
+AFTER DELETE ON Products
+FOR EACH ROW
+BEGIN
+    INSERT INTO ProductArchive (ProductID, ProductName, Category, Price, DeletedAt)
+    VALUES (OLD.ProductID, OLD.ProductName, OLD.Category, OLD.Price, NOW());
+END $$
+
+DELIMITER ;
+
+-- Step 4: Test
+-- Products 1-4 have rows in Sales, so the foreign key blocks deleting them.
+-- Insert a new product with no sales, then delete it.
+INSERT INTO Products VALUES (5, 'Monitor', 'Electronics', 9000);
+
+DELETE FROM Products WHERE ProductID = 5;
+
+SELECT * FROM ProductArchive;
+
+/* Expected output:
+   ProductID | ProductName | Category    | Price   | DeletedAt
+   5         | Monitor     | Electronics | 9000.00 | (current date and time)
+*/
